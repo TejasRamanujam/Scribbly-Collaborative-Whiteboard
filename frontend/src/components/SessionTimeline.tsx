@@ -19,7 +19,7 @@ function pad4(n: number): string {
 }
 
 /**
- * The proof reel: play/scrub the plate's entire stroke log like a strip of
+ * The timeline: play/scrub the plate's entire stroke log like a strip of
  * proofs. Scrubbing pauses live sync upstream (via the replaying flag).
  */
 const SessionTimeline: React.FC<SessionTimelineProps> = ({
@@ -54,6 +54,15 @@ const SessionTimeline: React.FC<SessionTimelineProps> = ({
     }
     if (events.length === 0) return
 
+    // Starting from live (or the end of the log): rewind to a blank plate
+    // first, otherwise replayed events land on the already-final drawing
+    // and nothing visibly changes.
+    if (indexRef.current < 0 || indexRef.current >= events.length - 1) {
+      indexRef.current = -1
+      setCurrentIndex(-1)
+      onEventSeek(-1)
+    }
+
     setPlaying(true)
     intervalRef.current = setInterval(() => {
       const next = indexRef.current + 1
@@ -84,9 +93,9 @@ const SessionTimeline: React.FC<SessionTimelineProps> = ({
   const atLive = currentIndex < 0 || currentIndex >= events.length - 1
 
   return (
-    <footer className="transport" aria-label="Proof reel replay">
+    <footer className="transport" aria-label="Timeline replay">
       <span className="transport-label" title="Replay every stroke ever drawn on this plate">
-        proof reel
+        timeline
       </span>
 
       <button

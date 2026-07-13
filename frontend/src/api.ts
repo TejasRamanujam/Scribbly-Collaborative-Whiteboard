@@ -50,13 +50,3 @@ export async function exportBoard(id: number, format: string, width: number, hei
   const blob = await res.blob()
   return URL.createObjectURL(blob)
 }
-
-export async function uploadImage(id: number, file: File) {
-  const formData = new FormData()
-  formData.append('file', file)
-  const res = await fetch(`${BASE}/boards/${id}/image`, {
-    method: 'POST',
-    body: formData,
-  })
-  return res.json()
-}

@@ -28,7 +28,7 @@ const ExportDialog: React.FC<ExportDialogProps> = ({ boardId, onClose }) => {
     try {
       const result = await exportBoard(boardId, format, width, height)
       if (!result) {
-        alert('The proof would not pull — try again.')
+        alert('The download failed — try again.')
         return
       }
       const a = document.createElement('a')
@@ -41,7 +41,7 @@ const ExportDialog: React.FC<ExportDialogProps> = ({ boardId, onClose }) => {
       a.download = `scribbly_plate_${boardId}.${format}`
       a.click()
     } catch {
-      alert('The proof would not pull — try again.')
+      alert('The download failed — try again.')
     } finally {
       setLoading(false)
       onClose()
@@ -60,7 +60,7 @@ const ExportDialog: React.FC<ExportDialogProps> = ({ boardId, onClose }) => {
       >
         <div className="modal-head">
           <span className="modal-eyebrow">output № {boardId}</span>
-          <h2 className="modal-title">Pull a proof</h2>
+          <h2 className="modal-title">Download</h2>
           <p className="modal-sub">Print this plate to a file.</p>
         </div>
 
@@ -113,7 +113,7 @@ const ExportDialog: React.FC<ExportDialogProps> = ({ boardId, onClose }) => {
             cancel
           </button>
           <button className="modal-go" onClick={handleExport} disabled={loading}>
-            {loading ? 'pulling…' : 'pull proof →'}
+            {loading ? 'downloading…' : 'download →'}
           </button>
         </div>
       </div>

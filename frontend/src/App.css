@@ -357,7 +357,8 @@
 
 .deck-top-left {
   display: flex;
-  align-items: center;
+  /* baseline keeps "← index" level with the plate № chip and the title */
+  align-items: baseline;
   gap: 16px;
   min-width: 0;
 }
@@ -396,7 +397,8 @@
   font-family: var(--serif);
   font-weight: 400;
   font-size: 21px;
-  line-height: 1.1;
+  /* roomy enough that overflow:hidden can't clip descenders (g, y, p) */
+  line-height: 1.35;
   color: var(--ink);
   white-space: nowrap;
   overflow: hidden;
@@ -788,7 +790,14 @@
   white-space: nowrap;
 }
 
-/* ---------- the proof reel ---------- */
+/* ---------- the timeline ---------- */
+
+/* Liveblocks' floating badge is injected at runtime bottom-right; nudge it
+   down so it sits inside the transport strip (the space reserved by the
+   transport's right padding) instead of covering the rule line above it. */
+a[href*="liveblocks.io"] {
+  bottom: 7px !important;
+}
 
 .transport {
   flex: none;

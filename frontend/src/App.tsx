@@ -7,7 +7,7 @@ import ExportDialog from './components/ExportDialog'
 import PresenceCursors from './components/PresenceCursors'
 import { usePollingSync } from './hooks/usePollingSync'
 import { useLiveblocksRoom, BoardRoomEvent } from './hooks/useLiveblocksRoom'
-import { fetchBoards, createBoard, deleteBoard, fetchBoard, uploadImage } from './api'
+import { fetchBoards, createBoard, deleteBoard, fetchBoard } from './api'
 import { Stroke, Tool, Board } from './types'
 import { ReplayEvent } from './components/SessionTimeline'
 import './App.css'
@@ -97,11 +97,11 @@ function BoardIndex() {
           </h1>
           <p className="hero-sub">
             A shared drawing plate. Every stroke is broadcast live to everyone at the
-            bench, filed in a permanent log, and replayable like a proof reel.
+            bench, filed in a permanent log, and replayable on a timeline.
           </p>
           <p className="hero-annot" aria-label="Capabilities">
             realtime sync <span aria-hidden="true">·</span> live cursors{' '}
-            <span aria-hidden="true">·</span> proof-reel replay
+            <span aria-hidden="true">·</span> timeline replay
           </p>
         </section>
 
@@ -260,7 +260,6 @@ function Whiteboard() {
   const [showExport, setShowExport] = useState(false)
   const [events, setEvents] = useState<ReplayEvent[]>([])
   const [boardLoading, setBoardLoading] = useState(true)
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Per-user undo/redo: the stacks hold this client's own strokes only, so
   // undoing never deletes another participant's work on the shared board.
@@ -415,45 +414,13 @@ function Whiteboard() {
 
   // Clearing wipes the shared board for everyone and is not undoable.
   const handleClear = useCallback(() => {
-    if (!window.confirm('Wipe the plate for everyone? The proof reel keeps the history.')) return
+    if (!window.confirm('Wipe the plate for everyone? The timeline keeps the history.')) return
     replayingRef.current = false
     undoStackRef.current = []
     redoStackRef.current = []
     setStrokes([])
     emitEvent('clear', {})
   }, [emitEvent])
-
-  // Image upload: the backend appends an 'add' event with the image stroke;
-  // we apply the returned stroke locally + broadcast so peers see it now
-  // (the polling reconciliation dedupes by stroke id later).
-  const handleImagePick = useCallback(() => fileInputRef.current?.click(), [])
-  const handleImageFile = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0]
-      e.target.value = ''
-      if (!file || boardId === null) return
-      try {
-        const res = await uploadImage(boardId, file)
-        const stroke = res?.stroke as Stroke | undefined
-        if (stroke && stroke.id) {
-          replayingRef.current = false
-          setStrokes((prev) =>
-            applyEventsToStrokes(prev, [
-              { event_type: 'add', stroke_data: stroke } as unknown as ReplayEvent,
-            ])
-          )
-          broadcast({
-            event_type: 'add',
-            stroke_data: stroke as unknown as Record<string, unknown>,
-            user_id: userId,
-          })
-        }
-      } catch {
-        window.alert('The image would not take — try a smaller file.')
-      }
-    },
-    [boardId, broadcast, userId]
-  )
 
   const handleReplayEvent = useCallback((event: Record<string, unknown>) => {
     replayingRef.current = true
@@ -544,7 +511,6 @@ function Whiteboard() {
           onRedo={handleRedo}
           onClear={handleClear}
           onExport={() => setShowExport(true)}
-          onImage={handleImagePick}
           canUndo={undoStackRef.current.length > 0}
           canRedo={redoStackRef.current.length > 0}
         />
@@ -592,16 +558,6 @@ function Whiteboard() {
         events={events}
         onReplayEvent={handleReplayEvent}
         onEventSeek={handleEventSeek}
-      />
-
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        onChange={handleImageFile}
-        style={{ display: 'none' }}
-        aria-hidden="true"
-        tabIndex={-1}
       />
 
       {showExport && boardId !== null && (

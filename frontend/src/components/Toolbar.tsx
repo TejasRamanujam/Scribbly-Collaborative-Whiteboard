@@ -41,7 +41,6 @@ interface ToolbarProps {
   onRedo: () => void
   onClear: () => void
   onExport: () => void
-  onImage: () => void
   canUndo: boolean
   canRedo: boolean
 }
@@ -57,7 +56,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
   onRedo,
   onClear,
   onExport,
-  onImage,
   canUndo,
   canRedo,
 }) => {
@@ -168,9 +166,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
             ^⇧Z
           </span>
         </button>
-        <button className="app-row" onClick={onImage} title="Fix an image onto the plate" aria-label="Place image">
-          <span className="app-row-name">Image</span>
-        </button>
         <button className="app-row app-row-danger" onClick={onClear} title="Wipe the plate for everyone" aria-label="Wipe plate">
           <span className="app-row-name">Wipe</span>
         </button>
@@ -178,7 +173,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
 
       <div className="rail-section rail-end">
         <button className="export-key" onClick={onExport} aria-label="Export board">
-          pull proof <span aria-hidden="true">→</span>
+          download <span aria-hidden="true">→</span>
         </button>
       </div>
     </aside>
