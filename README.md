@@ -1,75 +1,26 @@
-# Collaborative Whiteboard
+# Scribbly — Collaborative Whiteboard
 
-A real-time multi-user drawing whiteboard with WebSocket sync, CRDT state management, session recording/replay, and export to SVG/PNG/PDF.
+![CI](https://github.com/TejasRamanujam/Scribbly-Collaborative-Whiteboard/actions/workflows/ci.yml/badge.svg)
 
-## Tech Stack
+**Live: https://scribbly-collab.vercel.app**
 
-| Layer     | Technology                              |
-| --------- | --------------------------------------- |
-| Frontend  | React 18, TypeScript, Vite, HTML5 Canvas |
-| Backend   | FastAPI, SQLAlchemy, SQLite             |
-| Real-time | WebSocket (via FastAPI)                 |
-| Sync      | CRDT (Last-Writer-Wins Register)        |
-| Export    | PIL/Pillow (SVG/PNG/PDF)                |
+Real-time collaborative whiteboard. Every stroke is broadcast to everyone on the board, filed in a permanent event log, and replayable on a timeline.
 
-## Quick Start
+## Features
+- Multi-user freehand drawing with live cursors (Liveblocks realtime, polling fallback)
+- Persistent stroke history in Postgres — nothing lost on refresh
+- Timeline replay: scrub or play back the entire drawing history
+- Pen, marker, eraser, shapes; per-user undo/redo; SVG/PNG export
+- Touch drawing on mobile
 
+## Stack
+React + TypeScript (Vite) · FastAPI on Vercel functions · Neon Postgres · Liveblocks
+
+## Run locally
 ```bash
-# Backend
-cd backend
-pip install -r requirements.txt
-uvicorn main:app --reload --port 8000
-
-# Frontend
-cd frontend
-npm install
-npm run dev
+cd frontend && npm install && npm run dev   # frontend on :5173
+cd backend && pip install -r ../requirements.txt && uvicorn main:app --reload
 ```
 
-Open http://localhost:5173
-
-## Docker
-
-```bash
-docker-compose up --build
-```
-
-## WebSocket Protocol
-
-Connect: `ws://localhost:8000/ws/{board_id}?user_id={name}`
-
-### Client → Server
-
-| Message Type     | Payload                                     |
-| ---------------- | ------------------------------------------- |
-| `stroke_add`     | `{type, data: {id, points, color, width, tool}}` |
-| `stroke_update`  | `{type, data: {id, ...}}`                   |
-| `stroke_delete`  | `{type, data: {id}}`                        |
-| `board_clear`    | `{type, data: {}}`                          |
-| `cursor_move`    | `{type, x, y}`                              |
-
-### Server → Client
-
-| Message Type    | Payload                              |
-| --------------- | ------------------------------------ |
-| `stroke_event`  | `{type, event_type, data}`           |
-| `cursor_move`   | `{type, user_id, x, y}`              |
-| `user_joined`   | `{type, user_id}`                    |
-| `user_left`     | `{type, user_id}`                    |
-
-## REST API
-
-| Method | Endpoint                     | Description        |
-| ------ | ---------------------------- | ------------------ |
-| GET    | `/api/boards`                | List all boards    |
-| POST   | `/api/boards`                | Create board       |
-| GET    | `/api/boards/{id}`           | Get board + strokes |
-| GET    | `/api/boards/{id}/events`    | Event log (replay) |
-| POST   | `/api/boards/{id}/export`    | Export SVG/PNG/PDF |
-| POST   | `/api/boards/{id}/image`     | Upload image       |
-
-## Export Formats
-
-SVG — Vector format, scalable, renders strokes as `<path>` elements.
-PNG — Raster format, renders strokes with Pillow ImageDraw.
-PDF — Same as PNG but wrapped in PDF container.
+## Architecture
+`frontend/` Vite SPA → `/api/*` rewrites → `api/index.py` (FastAPI) → Neon. Realtime layer broadcasts events over Liveblocks; the durable event log reconciles by stroke id, so transports never double-apply.
