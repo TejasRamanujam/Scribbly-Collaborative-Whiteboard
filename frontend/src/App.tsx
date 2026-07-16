@@ -160,14 +160,20 @@ function BoardIndex() {
                     open →
                   </span>
                 </button>
-                <button
-                  className="board-delete"
-                  aria-label={`Delete board ${b.name}`}
-                  title="Strike this plate from the ledger"
-                  onClick={() => handleDelete(b)}
-                >
-                  ✕
-                </button>
+                {b.protected ? (
+                  <span className="board-protected" title="Curated showcase plate — shared drawing remains enabled">
+                    proof
+                  </span>
+                ) : (
+                  <button
+                    className="board-delete"
+                    aria-label={`Delete board ${b.name}`}
+                    title="Strike this plate from the ledger"
+                    onClick={() => handleDelete(b)}
+                  >
+                    ✕
+                  </button>
+                )}
               </li>
             ))}
           </ul>

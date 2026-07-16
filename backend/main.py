@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import httpx
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, UploadFile, File, Query
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, UploadFile, File, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel
@@ -19,12 +19,35 @@ from export import export_svg, export_png, export_pdf
 
 app = FastAPI(title="Collaborative Whiteboard")
 
+PROTECTED_BOARD_NAMES = {
+    "Welcome — Demo Sketch",
+    "Team Brainstorm",
+    "Blank Canvas",
+    "House Sketch",
+    "Star",
+    "Flow Diagram",
+    "Retro Notes",
+    "Gallery — start here",
+}
+MAX_IMAGE_BYTES = 5 * 1024 * 1024
+
+
+def is_protected(board: Board) -> bool:
+    return board.name in PROTECTED_BOARD_NAMES
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=[
+        origin.strip()
+        for origin in os.environ.get(
+            "ALLOWED_ORIGINS",
+            "https://scribbly-collab.vercel.app,http://localhost:5173",
+        ).split(",")
+        if origin.strip()
+    ],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type"],
 )
 
 
@@ -37,6 +60,7 @@ def list_boards(db: Session = Depends(get_db)):
             "name": b.name,
             "created_at": b.created_at.isoformat() if b.created_at else None,
             "strokes": b.strokes or [],
+            "protected": is_protected(b),
         }
         for b in boards
     ]
@@ -62,6 +86,8 @@ def delete_board(board_id: int, db: Session = Depends(get_db)):
     board = db.query(Board).filter(Board.id == board_id).first()
     if not board:
         return Response(content='{"error":"not found"}', status_code=404, media_type="application/json")
+    if is_protected(board):
+        raise HTTPException(status_code=403, detail="Curated showcase plates cannot be deleted")
     db.query(StrokeEvent).filter(StrokeEvent.board_id == board_id).delete()
     db.delete(board)
     db.commit()
@@ -82,6 +108,7 @@ def get_board(board_id: int, db: Session = Depends(get_db)):
         "name": board.name,
         "created_at": board.created_at.isoformat() if board.created_at else None,
         "strokes": board.strokes or [],
+        "protected": is_protected(board),
     }
 
 
@@ -232,7 +259,11 @@ def export_board(
 
 @app.post("/api/boards/{board_id}/image")
 async def upload_image(board_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
-    contents = await file.read()
+    if not (file.content_type or "").startswith("image/"):
+        raise HTTPException(status_code=415, detail="Only image uploads are supported")
+    contents = await file.read(MAX_IMAGE_BYTES + 1)
+    if len(contents) > MAX_IMAGE_BYTES:
+        raise HTTPException(status_code=413, detail="Image exceeds the 5 MB demo limit")
     import base64
     import os
 
