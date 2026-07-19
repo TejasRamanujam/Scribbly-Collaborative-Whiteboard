@@ -476,6 +476,11 @@ function Whiteboard() {
     [events]
   )
 
+  const handleReplayReset = useCallback(() => {
+    replayingRef.current = false
+    setStrokes(applyEventsToStrokes([], events))
+  }, [events])
+
   // Tool hotkeys — documented in the apparatus rail. Skipped while typing.
   useEffect(() => {
     const keys: Record<string, Tool> = {
@@ -600,6 +605,7 @@ function Whiteboard() {
         events={events}
         onReplayEvent={handleReplayEvent}
         onEventSeek={handleEventSeek}
+        onResetToLive={handleReplayReset}
         autoplay={autoReplay}
       />
 
