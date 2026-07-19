@@ -5,10 +5,12 @@ import Toolbar from './components/Toolbar'
 import SessionTimeline from './components/SessionTimeline'
 import ExportDialog from './components/ExportDialog'
 import PresenceCursors from './components/PresenceCursors'
+import PresenceRoster from './components/PresenceRoster'
+import BoardThumbnail from './components/BoardThumbnail'
 import { usePollingSync } from './hooks/usePollingSync'
 import { useLiveblocksRoom, BoardRoomEvent } from './hooks/useLiveblocksRoom'
 import { fetchBoards, createBoard, deleteBoard, fetchBoard } from './api'
-import { Stroke, Tool, Board } from './types'
+import { Stroke, Tool, Board, ViewTransform } from './types'
 import { ReplayEvent } from './components/SessionTimeline'
 import './App.css'
 
@@ -121,6 +123,7 @@ function BoardIndex() {
         </div>
 
         <div className="board-list-head" aria-hidden="true">
+          <span>proof</span>
           <span>№</span>
           <span>plate</span>
           <span className="head-date">cut</span>
@@ -143,6 +146,7 @@ function BoardIndex() {
                 style={{ '--i': i } as React.CSSProperties}
               >
                 <button className="board-open" onClick={() => navigate(`/board/${b.id}`)}>
+                  <BoardThumbnail strokes={b.strokes || []} />
                   <span className="board-no" aria-hidden="true">
                     № {pad(b.id)}
                   </span>
@@ -267,6 +271,7 @@ function Whiteboard() {
   const [events, setEvents] = useState<ReplayEvent[]>([])
   const [boardLoading, setBoardLoading] = useState(true)
   const [protectedBoard, setProtectedBoard] = useState(false)
+  const [view, setView] = useState<ViewTransform>({ x: 0, y: 0, scale: 1 })
 
   // Per-user undo/redo: the stacks hold this client's own strokes only, so
   // undoing never deletes another participant's work on the shared board.
@@ -323,6 +328,7 @@ function Whiteboard() {
   const {
     connected: rtConnected,
     others: remoteCursors,
+    participants,
     broadcast,
     updateCursor,
   } = useLiveblocksRoom(boardId, userId, handleRealtimeEvent)
@@ -351,15 +357,14 @@ function Whiteboard() {
     [sendEvent, broadcast, userId]
   )
 
-  // Live cursor presence, throttled to ~40ms, in canvas coordinates.
+  // Live cursor presence, throttled to ~40ms, in world coordinates.
   const lastCursorSentRef = useRef(0)
-  const handlePointerMove = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
+  const handleCursorMove = useCallback(
+    (x: number, y: number) => {
       const now = performance.now()
       if (now - lastCursorSentRef.current < 40) return
       lastCursorSentRef.current = now
-      const rect = e.currentTarget.getBoundingClientRect()
-      updateCursor({ x: e.clientX - rect.left, y: e.clientY - rect.top })
+      updateCursor({ x, y })
     },
     [updateCursor]
   )
@@ -373,6 +378,7 @@ function Whiteboard() {
     setProtectedBoard(false)
     setEvents([])
     setStrokes([])
+    setView({ x: 0, y: 0, scale: 1 })
     undoStackRef.current = []
     redoStackRef.current = []
     fetchBoard(boardId).then((b) => {
@@ -471,6 +477,7 @@ function Whiteboard() {
       r: 'rectangle',
       o: 'circle',
       l: 'line',
+      t: 'text',
     }
     const onKey = (ev: KeyboardEvent) => {
       const t = ev.target as HTMLElement | null
@@ -495,8 +502,6 @@ function Whiteboard() {
   }, [protectedBoard, tool])
 
   const sync = SYNC_META[rtConnected ? 'realtime' : syncStatus]
-  const peers = remoteCursors.length
-
   return (
     <div className="deck">
       <header className="deck-top">
@@ -512,14 +517,7 @@ function Whiteboard() {
           </div>
         </div>
         <div className="deck-top-right">
-          {peers > 0 && (
-            <span
-              className="peers-chip"
-              title={`${peers} other ${peers === 1 ? 'person' : 'people'} drawing at this bench now`}
-            >
-              {peers} at the bench
-            </span>
-          )}
+          <PresenceRoster self={userId} participants={participants} />
           <span className={`sync-module ${sync.cls}`} title={sync.title} role="status">
             <span className="sync-dot" aria-hidden="true" />
             {sync.label}
@@ -550,7 +548,6 @@ function Whiteboard() {
         <div className="press-bed">
           <div
             className="board-area"
-            onPointerMove={handlePointerMove}
             onPointerLeave={handlePointerLeave}
           >
             <Canvas
@@ -558,11 +555,14 @@ function Whiteboard() {
               tool={tool}
               color={color}
               width={width}
+              view={view}
+              onViewChange={setView}
               onStrokeAdd={handleStrokeAdd}
               onStrokeUpdate={handleStrokeUpdate}
               onStrokeEnd={handleStrokeEnd}
+              onCursorMove={handleCursorMove}
             />
-            <PresenceCursors cursors={remoteCursors} />
+            <PresenceCursors cursors={remoteCursors} view={view} />
             {boardLoading && (
               <div className="board-loading" role="status">
                 reading the log

@@ -16,6 +16,14 @@ export interface Stroke {
   image_data?: string
   x?: number
   y?: number
+  text?: string
+  font_size?: number
+}
+
+export interface ViewTransform {
+  x: number
+  y: number
+  scale: number
 }
 
 export interface Board {

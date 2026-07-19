@@ -14,6 +14,7 @@ const TOOLS: { id: Tool; label: string; hotkey: string }[] = [
   { id: 'rectangle', label: 'Rectangle', hotkey: 'R' },
   { id: 'circle', label: 'Ellipse', hotkey: 'O' },
   { id: 'line', label: 'Line', hotkey: 'L' },
+  { id: 'text', label: 'Text', hotkey: 'T' },
 ]
 
 /* Proofing inks — light pigments that read on the dark litho plate. */

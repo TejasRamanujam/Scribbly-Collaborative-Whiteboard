@@ -3,7 +3,7 @@ import time
 from io import BytesIO
 from xml.etree import ElementTree as ET
 from xml.dom import minidom
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 
 
 def export_svg(board_strokes: list, width: int = 800, height: int = 600) -> str:
@@ -19,6 +19,30 @@ def export_svg(board_strokes: list, width: int = 800, height: int = 600) -> str:
 
     for stroke in board_strokes:
         if stroke.get("deleted"):
+            continue
+        if stroke.get("tool") == "text" and stroke.get("text"):
+            pts = stroke.get("points", [])
+            x = (pts[0].get("x") if pts else stroke.get("x")) or 0
+            y = (pts[0].get("y") if pts else stroke.get("y")) or 0
+            size = int(stroke.get("font_size", 18))
+            text = ET.SubElement(
+                svg,
+                "text",
+                x=str(x),
+                y=str(y),
+                fill=stroke.get("color", "#ffffff"),
+                font_size=str(size),
+                font_family="Georgia, serif",
+                dominant_baseline="hanging",
+            )
+            for index, line in enumerate(str(stroke["text"]).splitlines() or [""]):
+                span = ET.SubElement(
+                    text,
+                    "tspan",
+                    x=str(x),
+                    dy="0" if index == 0 else str(size * 1.2),
+                )
+                span.text = line
             continue
         pts = stroke.get("points", [])
         if len(pts) < 2:
@@ -61,6 +85,23 @@ def export_png(board_strokes: list, width: int = 800, height: int = 600) -> byte
 
     for stroke in board_strokes:
         if stroke.get("deleted"):
+            continue
+        if stroke.get("tool") == "text" and stroke.get("text"):
+            pts = stroke.get("points", [])
+            x = (pts[0].get("x") if pts else stroke.get("x")) or 0
+            y = (pts[0].get("y") if pts else stroke.get("y")) or 0
+            size = int(stroke.get("font_size", 18))
+            try:
+                font = ImageFont.truetype("DejaVuSans.ttf", size)
+            except OSError:
+                font = ImageFont.load_default()
+            draw.multiline_text(
+                (x, y),
+                str(stroke["text"]),
+                fill=stroke.get("color", "#ffffff"),
+                font=font,
+                spacing=max(2, int(size * 0.2)),
+            )
             continue
         pts = stroke.get("points", [])
         if not pts:
