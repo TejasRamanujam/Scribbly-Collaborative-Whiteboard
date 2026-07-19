@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { drawStroke } from '../drawing'
+import { drawStroke, findStrokeAt, strokeBounds, translateStroke } from '../drawing'
 import type { Point, Stroke, Tool, ViewTransform } from '../types'
 
 interface CanvasProps {
@@ -12,6 +12,7 @@ interface CanvasProps {
   onStrokeAdd: (stroke: Stroke) => void
   onStrokeUpdate: (stroke: Stroke) => void
   onStrokeEnd?: (stroke: Stroke) => void
+  onStrokeCommit?: (stroke: Stroke) => void
   onCursorMove?: (x: number, y: number) => void
   readOnly?: boolean
 }
@@ -31,6 +32,7 @@ const Canvas: React.FC<CanvasProps> = ({
   onStrokeAdd,
   onStrokeUpdate,
   onStrokeEnd,
+  onStrokeCommit,
   onCursorMove,
   readOnly,
 }) => {
@@ -41,7 +43,9 @@ const Canvas: React.FC<CanvasProps> = ({
   const panRef = useRef<{ clientX: number; clientY: number; x: number; y: number } | null>(null)
   const imageCacheRef = useRef(new Map<string, HTMLImageElement>())
   const textCommittingRef = useRef(false)
+  const selectionDragRef = useRef<{ origin: Point; original: Stroke; current: Stroke; moved: boolean } | null>(null)
   const [textDraft, setTextDraft] = useState<TextDraft | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const renderAll = useCallback(() => {
     const canvas = canvasRef.current
@@ -68,10 +72,36 @@ const Canvas: React.FC<CanvasProps> = ({
         drawStroke(ctx, stroke)
       }
     }
+    const selected = strokes.find((stroke) => stroke.id === selectedId)
+    const bounds = selected ? strokeBounds(selected) : null
+    if (bounds) {
+      const padding = 5 / view.scale
+      ctx.save()
+      ctx.strokeStyle = '#ff6a3d'
+      ctx.lineWidth = 1.5 / view.scale
+      ctx.setLineDash([6 / view.scale, 4 / view.scale])
+      ctx.strokeRect(
+        bounds.minX - padding,
+        bounds.minY - padding,
+        bounds.maxX - bounds.minX + padding * 2,
+        bounds.maxY - bounds.minY + padding * 2
+      )
+      ctx.restore()
+    }
     ctx.restore()
-  }, [strokes, view])
+  }, [selectedId, strokes, view])
 
   useEffect(() => renderAll(), [renderAll])
+
+  useEffect(() => {
+    if (tool !== 'select') setSelectedId(null)
+  }, [tool])
+
+  useEffect(() => {
+    if (selectedId && !strokes.some((stroke) => stroke.id === selectedId && !stroke.deleted)) {
+      setSelectedId(null)
+    }
+  }, [selectedId, strokes])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -135,6 +165,14 @@ const Canvas: React.FC<CanvasProps> = ({
     event.preventDefault()
     const point = getCanvasPoint(event)
     onCursorMove?.(point.x, point.y)
+    if (tool === 'select') {
+      const selected = findStrokeAt(strokes, point, 8 / view.scale)
+      setSelectedId(selected?.id ?? null)
+      selectionDragRef.current = selected
+        ? { origin: point, original: selected, current: selected, moved: false }
+        : null
+      return
+    }
     if (tool === 'text') {
       textCommittingRef.current = false
       setTextDraft({ point, value: '' })
@@ -155,7 +193,7 @@ const Canvas: React.FC<CanvasProps> = ({
     drawingRef.current = true
     currentStrokeRef.current = stroke
     onStrokeAdd(stroke)
-  }, [color, eventPosition, getCanvasPoint, onCursorMove, onStrokeAdd, readOnly, tool, view, width])
+  }, [color, eventPosition, getCanvasPoint, onCursorMove, onStrokeAdd, readOnly, strokes, tool, view, width])
 
   const move = useCallback((event: React.MouseEvent | React.TouchEvent) => {
     const position = eventPosition(event)
@@ -170,6 +208,18 @@ const Canvas: React.FC<CanvasProps> = ({
     }
     const point = getCanvasPoint(event)
     onCursorMove?.(point.x, point.y)
+    if (selectionDragRef.current && !readOnly) {
+      event.preventDefault()
+      const translated = translateStroke(
+        selectionDragRef.current.original,
+        point.x - selectionDragRef.current.origin.x,
+        point.y - selectionDragRef.current.origin.y
+      )
+      selectionDragRef.current.current = translated
+      selectionDragRef.current.moved = true
+      onStrokeUpdate(translated)
+      return
+    }
     if (!drawingRef.current || !currentStrokeRef.current || readOnly) return
     event.preventDefault()
     const shape = ['rectangle', 'circle', 'line'].includes(currentStrokeRef.current.tool)
@@ -186,12 +236,18 @@ const Canvas: React.FC<CanvasProps> = ({
       panRef.current = null
       return
     }
+    if (selectionDragRef.current) {
+      const { current: moved, moved: didMove } = selectionDragRef.current
+      selectionDragRef.current = null
+      if (didMove) onStrokeCommit?.(moved)
+      return
+    }
     if (!drawingRef.current) return
     const finished = currentStrokeRef.current
     drawingRef.current = false
     currentStrokeRef.current = null
     if (finished) onStrokeEnd?.(finished)
-  }, [onStrokeEnd])
+  }, [onStrokeCommit, onStrokeEnd])
 
   const commitText = useCallback((value: string) => {
     if (textCommittingRef.current) return
@@ -232,6 +288,7 @@ const Canvas: React.FC<CanvasProps> = ({
       <canvas
         ref={canvasRef}
         className="whiteboard-canvas"
+        data-tool={tool}
         onMouseDown={startDraw}
         onMouseMove={move}
         onMouseUp={endDraw}

@@ -422,6 +422,14 @@ function Whiteboard() {
     [emitEvent]
   )
 
+  const handleStrokeCommit = useCallback(
+    (stroke: Stroke) => {
+      replayingRef.current = false
+      emitEvent('update', stroke as unknown as Record<string, unknown>)
+    },
+    [emitEvent]
+  )
+
   const handleUndo = useCallback(() => {
     if (protectedBoard) return
     const stroke = undoStackRef.current.pop()
@@ -472,6 +480,7 @@ function Whiteboard() {
   useEffect(() => {
     const keys: Record<string, Tool> = {
       p: 'pen',
+      v: 'select',
       m: 'highlighter',
       e: 'eraser',
       r: 'rectangle',
@@ -491,14 +500,14 @@ function Whiteboard() {
         return
       }
       const tool = keys[ev.key.toLowerCase()]
-      if (tool && !(protectedBoard && tool === 'eraser')) setTool(tool)
+      if (tool && !(protectedBoard && (tool === 'eraser' || tool === 'select'))) setTool(tool)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [handleUndo, handleRedo, protectedBoard])
 
   useEffect(() => {
-    if (protectedBoard && tool === 'eraser') setTool('pen')
+    if (protectedBoard && (tool === 'eraser' || tool === 'select')) setTool('pen')
   }, [protectedBoard, tool])
 
   const sync = SYNC_META[rtConnected ? 'realtime' : syncStatus]
@@ -560,6 +569,7 @@ function Whiteboard() {
               onStrokeAdd={handleStrokeAdd}
               onStrokeUpdate={handleStrokeUpdate}
               onStrokeEnd={handleStrokeEnd}
+              onStrokeCommit={handleStrokeCommit}
               onCursorMove={handleCursorMove}
             />
             <PresenceCursors cursors={remoteCursors} view={view} />

@@ -82,6 +82,55 @@ export function drawStroke(ctx: CanvasRenderingContext2D, stroke: Stroke) {
   ctx.restore()
 }
 
+export function strokeBounds(stroke: Stroke) {
+  if (stroke.image_data) {
+    return {
+      minX: stroke.x ?? 0,
+      minY: stroke.y ?? 0,
+      maxX: (stroke.x ?? 0) + 240,
+      maxY: (stroke.y ?? 0) + 180,
+    }
+  }
+  const points = [...(stroke.points || [])]
+  if (stroke.tool === 'text' && stroke.text && points[0]) {
+    const size = stroke.font_size ?? 18
+    const lines = stroke.text.split('\n')
+    points.push({
+      x: points[0].x + Math.max(...lines.map((line) => line.length), 1) * size * 0.62,
+      y: points[0].y + lines.length * size * 1.2,
+      pressure: 0.5,
+    })
+  }
+  if (!points.length) return null
+  const padding = Math.max(stroke.width, 4)
+  return {
+    minX: Math.min(...points.map((point) => point.x)) - padding,
+    minY: Math.min(...points.map((point) => point.y)) - padding,
+    maxX: Math.max(...points.map((point) => point.x)) + padding,
+    maxY: Math.max(...points.map((point) => point.y)) + padding,
+  }
+}
+
+export function findStrokeAt(strokes: Stroke[], point: Point, tolerance = 6) {
+  return [...strokes].reverse().find((stroke) => {
+    if (stroke.deleted) return false
+    const bounds = strokeBounds(stroke)
+    return bounds &&
+      point.x >= bounds.minX - tolerance && point.x <= bounds.maxX + tolerance &&
+      point.y >= bounds.minY - tolerance && point.y <= bounds.maxY + tolerance
+  }) ?? null
+}
+
+export function translateStroke(stroke: Stroke, dx: number, dy: number): Stroke {
+  return {
+    ...stroke,
+    points: (stroke.points || []).map((point) => ({ ...point, x: point.x + dx, y: point.y + dy })),
+    x: stroke.x === undefined ? undefined : stroke.x + dx,
+    y: stroke.y === undefined ? undefined : stroke.y + dy,
+    timestamp: Date.now(),
+  }
+}
+
 export function drawingBounds(strokes: Stroke[]) {
   const points = strokes.flatMap((stroke) => {
     const strokePoints = [...(stroke.points || [])]

@@ -762,6 +762,8 @@
 .whiteboard-canvas {
   display: block;
 }
+.whiteboard-canvas[data-tool='select'] { cursor: grab; }
+.whiteboard-canvas[data-tool='select']:active { cursor: grabbing; }
 
 .canvas-stage { position: absolute; inset: 0; overflow: hidden; }
 
