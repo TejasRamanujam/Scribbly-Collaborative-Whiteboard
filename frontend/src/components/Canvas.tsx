@@ -272,7 +272,9 @@ const Canvas: React.FC<CanvasProps> = ({
     onStrokeEnd?.(stroke)
   }, [color, onStrokeAdd, onStrokeEnd, textDraft, width])
 
-  const zoom = useCallback((event: React.WheelEvent) => {
+  // React registers wheel listeners as passive, so preventDefault inside
+  // onWheel is ignored — attach a non-passive native listener instead.
+  const zoom = useCallback((event: WheelEvent) => {
     event.preventDefault()
     const rect = canvasRef.current!.getBoundingClientRect()
     const x = event.clientX - rect.left
@@ -282,6 +284,13 @@ const Canvas: React.FC<CanvasProps> = ({
     const worldY = (y - view.y) / view.scale
     onViewChange({ scale, x: x - worldX * scale, y: y - worldY * scale })
   }, [onViewChange, view])
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    canvas.addEventListener('wheel', zoom, { passive: false })
+    return () => canvas.removeEventListener('wheel', zoom)
+  }, [zoom])
 
   return (
     <div className="canvas-stage">
@@ -296,7 +305,6 @@ const Canvas: React.FC<CanvasProps> = ({
         onTouchStart={startDraw}
         onTouchMove={move}
         onTouchEnd={endDraw}
-        onWheel={zoom}
         onDoubleClick={() => onViewChange({ x: 0, y: 0, scale: 1 })}
         style={{ touchAction: 'none', width: '100%', height: '100%' }}
       />
